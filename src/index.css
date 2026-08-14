@@ -1,0 +1,52 @@
+:root {
+  --ink: #0a1628;
+  --ink-soft: #1a2d45;
+  --sea: #0f766e;
+  --sea-bright: #14b8a6;
+  --mist: #e7eef4;
+  --paper: #f4f7fa;
+  --line: rgba(10, 22, 40, 0.12);
+  --amber: #c4a35a;
+  --danger: #b42318;
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --shadow-soft: 0 24px 60px rgba(10, 22, 40, 0.12);
+  --radius: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
