@@ -1,5 +1,16 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { courseMeta, weekSummaries, type WeekSummary } from './data/summaries'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  courseMeta,
+  glossary,
+  weekSummaries,
+  type WeekSummary,
+} from './data/summaries'
+import {
+  createSavedSummary,
+  loadSavedSummaries,
+  persistSavedSummaries,
+  type SavedSummary,
+} from './lib/savedSummaries'
 import { generateSummary, type GeneratedSummary } from './lib/summarize'
 import './App.css'
 
@@ -107,10 +118,81 @@ function SummaryWorkspace() {
   )
 }
 
+function GlossarySection() {
+  const [query, setQuery] = useState('')
+  const [weekFilter, setWeekFilter] = useState<'all' | number>('all')
+
+  const terms = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return glossary.filter((term) => {
+      const weekOk = weekFilter === 'all' || term.week === weekFilter
+      if (!weekOk) return false
+      if (!q) return true
+      return (
+        term.term.toLowerCase().includes(q) ||
+        term.definition.toLowerCase().includes(q)
+      )
+    })
+  }, [query, weekFilter])
+
+  return (
+    <div className="glossary">
+      <div className="glossary__controls">
+        <label className="glossary__search">
+          <span className="visually-hidden">Search terms</span>
+          <input
+            type="search"
+            placeholder="Search terms…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        <div className="week-tabs" role="group" aria-label="Filter by week">
+          <button
+            type="button"
+            className={weekFilter === 'all' ? 'week-tab is-active' : 'week-tab'}
+            onClick={() => setWeekFilter('all')}
+          >
+            All
+          </button>
+          {[1, 2, 3].map((week) => (
+            <button
+              key={week}
+              type="button"
+              className={weekFilter === week ? 'week-tab is-active' : 'week-tab'}
+              onClick={() => setWeekFilter(week)}
+            >
+              W{week}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <ul className="glossary__list">
+        {terms.map((term) => (
+          <li key={term.id}>
+            <div className="glossary__term-head">
+              <strong>{term.term}</strong>
+              <span>Week {term.week}</span>
+            </div>
+            <p>{term.definition}</p>
+          </li>
+        ))}
+      </ul>
+      {terms.length === 0 ? (
+        <p className="glossary__empty">No terms match that filter.</p>
+      ) : null}
+    </div>
+  )
+}
+
 function NoteSummarizer() {
   const [notes, setNotes] = useState('')
+  const [title, setTitle] = useState('')
   const [result, setResult] = useState<GeneratedSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState<SavedSummary[]>(() => loadSavedSummaries())
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
 
   function handleSummarize() {
     const summary = generateSummary(notes)
@@ -120,11 +202,39 @@ function NoteSummarizer() {
       return
     }
     setError(null)
+    setSaveMessage(null)
     setResult(summary)
+  }
+
+  function handleSave() {
+    if (!result) return
+    const item = createSavedSummary(result, title || 'Lecture summary')
+    const next = [item, ...saved].slice(0, 20)
+    setSaved(next)
+    persistSavedSummaries(next)
+    setSaveMessage('Saved on this device.')
+  }
+
+  function handleDelete(id: string) {
+    const next = saved.filter((item) => item.id !== id)
+    setSaved(next)
+    persistSavedSummaries(next)
   }
 
   return (
     <div className="summarizer">
+      <label className="summarizer__label" htmlFor="summary-title">
+        Title (optional)
+      </label>
+      <input
+        id="summary-title"
+        className="summarizer__title"
+        type="text"
+        placeholder="e.g. HC2 guest lecture notes"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+
       <label className="summarizer__label" htmlFor="lecture-notes">
         Paste lecture notes or slide text
       </label>
@@ -145,8 +255,10 @@ function NoteSummarizer() {
           className="btn btn--ghost"
           onClick={() => {
             setNotes('')
+            setTitle('')
             setResult(null)
             setError(null)
+            setSaveMessage(null)
           }}
         >
           Clear
@@ -168,6 +280,39 @@ function NoteSummarizer() {
               {result.keywords.join(' · ')}
             </p>
           ) : null}
+          <div className="summarizer__actions">
+            <button type="button" className="btn btn--primary" onClick={handleSave}>
+              Save summary
+            </button>
+          </div>
+          {saveMessage ? <p className="summarizer__saved">{saveMessage}</p> : null}
+        </div>
+      ) : null}
+
+      {saved.length > 0 ? (
+        <div className="saved-list">
+          <h3>Saved on this device</h3>
+          <ul>
+            {saved.map((item) => (
+              <li key={item.id}>
+                <div className="saved-list__head">
+                  <strong>{item.title}</strong>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small"
+                    onClick={() => handleDelete(item.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <p>{item.overview}</p>
+                <p className="saved-list__meta">
+                  {new Date(item.createdAt).toLocaleString()} · {item.bullets.length}{' '}
+                  bullets
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </div>
@@ -176,6 +321,7 @@ function NoteSummarizer() {
 
 export default function App() {
   const summariesSection = useInView<HTMLElement>()
+  const glossarySection = useInView<HTMLElement>()
   const createSection = useInView<HTMLElement>()
 
   return (
@@ -192,6 +338,7 @@ export default function App() {
           </a>
           <nav className="site-nav" aria-label="Primary">
             <a href="#summaries">Summaries</a>
+            <a href="#glossary">Terms</a>
             <a href="#create">Create</a>
           </nav>
         </div>
@@ -235,8 +382,28 @@ export default function App() {
         </section>
 
         <section
+          id="glossary"
+          className={glossarySection.visible ? 'section is-visible' : 'section'}
+          ref={glossarySection.ref}
+          aria-labelledby="glossary-title"
+        >
+          <div className="section__intro">
+            <h2 id="glossary-title">Terms and definitions</h2>
+            <p>
+              Core vocabulary from the lectures—search or filter by week before you
+              revise frameworks in full.
+            </p>
+          </div>
+          <GlossarySection />
+        </section>
+
+        <section
           id="create"
-          className={createSection.visible ? 'section section--create is-visible' : 'section section--create'}
+          className={
+            createSection.visible
+              ? 'section section--create is-visible'
+              : 'section section--create'
+          }
           ref={createSection.ref}
           aria-labelledby="create-title"
         >
@@ -244,7 +411,8 @@ export default function App() {
             <h2 id="create-title">Create a summary</h2>
             <p>
               Paste raw notes or slide text. ITGSS extracts a short overview, ranked
-              bullets, and keywords—offline, in your browser.
+              bullets, and keywords—offline, in your browser. Save results locally for
+              quick revision.
             </p>
           </div>
           <NoteSummarizer />
