@@ -90,6 +90,17 @@ const STOP = new Set([
   'their',
   'our',
   'your',
+  'who',
+  'whom',
+  'whose',
+  'what',
+  'which',
+  'into',
+  'used',
+  'ensure',
+  'make',
+  'makes',
+  'made',
 ])
 
 function splitSentences(text: string): string[] {

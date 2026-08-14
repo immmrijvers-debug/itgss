@@ -82,7 +82,7 @@
 .hero {
   position: relative;
   isolation: isolate;
-  min-height: min(92vh, 820px);
+  min-height: 100dvh;
   display: grid;
   align-items: end;
   overflow: hidden;
